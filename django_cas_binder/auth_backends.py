@@ -6,15 +6,18 @@ Mostly copied from django_cas_ng.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
-from django.conf import settings
 from django.db import transaction
-
 from django_cas_ng.signals import cas_user_authenticated
 from django_cas_ng.utils import get_cas_client
 
 from django_cas_binder.models import CASUser
+from django_cas_binder.utils import get_free_username
+
+
+USERNAME_TRIES_LIMIT = 1000
 
 
 __all__ = ['CASBinderBackend']
@@ -28,9 +31,16 @@ class CASBinderBackend(ModelBackend):
 
     @transaction.atomic
     def create_user_and_cas_user(self, universal_id, attributes):
+        def is_username_free(username):
+            return self.user_model.objects.filter(
+                username=username).count() == 0
+
+        username = get_free_username(
+            attributes['username'], is_username_free, USERNAME_TRIES_LIMIT)
         # user will have an "unusable" password
         u = self.user_model.objects.create_user(
-            attributes['username'], attributes['email'])
+            username, attributes['email'])
+
         CASUser.objects.create(universal_id=universal_id, user=u)
         return u
 

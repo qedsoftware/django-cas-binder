@@ -1,11 +1,11 @@
 import httmock
-from httmock import HTTMock
-from django.test import TestCase, override_settings
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from httmock import HTTMock
 
-from django_cas_binder.models import CASUser
 from django_cas_binder.auth_backends import CASBinderBackend
+from django_cas_binder.models import CASUser
 
 
 class FakeCAS(object):
@@ -129,3 +129,10 @@ class TestCASBinderBackend__UserDoesNotExist(TestCase):
         self.assertIsNone(res)
         self.assertEqual(list(get_user_model().objects.all()), [])
         self.assertEqual(list(CASUser.objects.all()), [])
+
+    def test_username_clash(self):
+        original_user = get_user_model().objects.create_user(
+            username='fake_username', password='')
+        user = self.perform_auth()
+        self.assertEqual(original_user.username, 'fake_username')
+        self.assertEqual(user.username, 'fake_username_2')
