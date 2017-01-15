@@ -1,0 +1,5 @@
+django
+django-cas-ng
+flake8
+httmock
+raven
