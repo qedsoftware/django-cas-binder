@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='django_cas_binder',
-    version='1.3',
+    version='1.4',
     description=(
         'A thin wrapper around django-cas-ng that allows to use identifier '
         'other than username.'
@@ -12,5 +12,5 @@ setup(
     author='',
     author_email='',
     url='',
-    packages=['django_cas_binder'],
+    packages=['django_cas_binder', 'django_cas_binder.migrations'],
 )
