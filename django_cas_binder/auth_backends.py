@@ -29,25 +29,37 @@ class CASBinderBackend(ModelBackend):
     def __init__(self):
         self.user_model = get_user_model()
 
-    @transaction.atomic
-    def create_user_and_cas_user(self, universal_id, attributes):
+    def clean_user_attributes_dict(self, attributes):
         def is_username_free(username):
             return self.user_model.objects.filter(
                 username=username).count() == 0
 
-        username = get_free_username(
+        attributes['username'] = get_free_username(
             attributes['username'], is_username_free, USERNAME_TRIES_LIMIT)
+
+    @transaction.atomic
+    def create_user_and_cas_user(self, universal_id, attributes):
         # user will have an "unusable" password
         u = self.user_model.objects.create_user(
-            username, attributes['email'])
-
+            attributes['username'], attributes['email'])
         CASUser.objects.create(universal_id=universal_id, user=u)
         return u
+
+    @transaction.atomic
+    def update_user_attributes(self, user, attributes):
+        update_attributes = getattr(
+            settings, 'CAS_BINDER_UPDATE_USER_ATTRIBUTES', [])
+        for attr in update_attributes:
+            if attr in attributes:
+                setattr(user, attr, attributes[attr])
+        user.save()
 
     def authenticate(self, ticket, service, request):
         """Verifies CAS ticket and gets or creates user object"""
         client = get_cas_client(service_url=service)
         universal_id, attributes, pgtiou = client.verify_ticket(ticket)
+        self.clean_user_attributes_dict(attributes)
+
         if attributes:
             request.session['attributes'] = attributes
         if not universal_id:
@@ -55,6 +67,7 @@ class CASBinderBackend(ModelBackend):
 
         try:
             user = CASUser.objects.get(universal_id=universal_id).user
+            self.update_user_attributes(user, attributes)
             created = False
         except CASUser.DoesNotExist:
             # check if we want to create new users, if we don't fail auth

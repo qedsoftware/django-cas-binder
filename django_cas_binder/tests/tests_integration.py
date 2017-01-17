@@ -51,7 +51,7 @@ class TestCASBinderBackend__UserExists(TestCase):
         self.django_request = FakeRequest()
         self.fake_cas = FakeCAS()
         self.user = get_user_model().objects.create_user(
-            username='fake_username', password='')
+            username='old_fake_username', email='old_fake_email@qed.ai')
         self.cas_user = CASUser.objects.create(
             user=self.user, universal_id='fake_universal_id')
 
@@ -89,6 +89,36 @@ class TestCASBinderBackend__UserExists(TestCase):
             self.django_request.session['attributes']['email'],
             'fake_email@qed.ai',
         )
+
+    @override_settings(CAS_BINDER_UPDATE_USER_ATTRIBUTES=['username'])
+    def test_auth_backend_should_update_username_when_requested(self):
+        self.assertEqual(self.user.username, 'old_fake_username')
+        self.perform_auth()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'fake_username')
+
+    @override_settings(CAS_BINDER_UPDATE_USER_ATTRIBUTES=['username'])
+    def test_auth_backend_should_update_username_correctly_on_collision(self):
+        get_user_model().objects.create(username='fake_username', email='')
+        self.assertEqual(self.user.username, 'old_fake_username')
+        self.perform_auth()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'fake_username_2')
+
+    @override_settings(CAS_BINDER_UPDATE_USER_ATTRIBUTES=['email'])
+    def test_auth_backend_should_update_email_when_requested(self):
+        self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
+        self.perform_auth()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'fake_email@qed.ai')
+
+    def test_auth_backend_should_not_update_user_attributes_by_default(self):
+        self.assertEqual(self.user.username, 'old_fake_username')
+        self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
+        self.perform_auth()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'old_fake_username')
+        self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
 
 
 @override_settings(CAS_SERVER_URL='http://fake-cas.qed.ai/')
