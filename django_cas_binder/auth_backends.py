@@ -32,8 +32,8 @@ class CASBinderBackend(ModelBackend):
     @transaction.atomic
     def create_user_and_cas_user(self, universal_id, attributes):
         def is_username_free(username):
-            return self.user_model.objects.filter(
-                username=username).count() == 0
+            return not self.user_model.objects.filter(
+                username=username).exists()
 
         username = get_free_username(
             attributes['username'], is_username_free, USERNAME_TRIES_LIMIT)
