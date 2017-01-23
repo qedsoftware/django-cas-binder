@@ -102,3 +102,11 @@ class CASBinderBackend(ModelBackend):
             return self.user_model.objects.get(pk=user_id)
         except self.user_model.DoesNotExist:
             return None
+
+    def user_can_authenticate(self, user):
+        """Added for compatibility with older Django versions (1.9), which
+        don't implement user_can_authenticate.
+
+        Field `active` is not considered here. CAS server should care for that.
+        """
+        return True
