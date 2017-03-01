@@ -1,11 +1,13 @@
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from django_cas_ng.backends import User
 
 from django_cas_binder.models import CASUser
 
 
 @transaction.atomic
 def assign_universal_ids(mapping):
+    User = get_user_model()
+
     for email, universal_id in mapping.items():
         user = User.objects.filter(email=email).first()
         if user is not None:
