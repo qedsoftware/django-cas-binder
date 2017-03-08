@@ -54,13 +54,13 @@ class CASBinderBackend(ModelBackend):
                 setattr(user, attr, attributes[attr])
         user.save()
 
-    def authenticate(self, ticket, service, request):
+    def authenticate(self, ticket, service, request=None):
         """Verifies CAS ticket and gets or creates user object"""
         client = get_cas_client(service_url=service)
         universal_id, attributes, pgtiou = client.verify_ticket(ticket)
         self.clean_user_attributes_dict(attributes)
 
-        if attributes:
+        if attributes and request:
             request.session['attributes'] = attributes
         if not universal_id:
             return None
@@ -81,7 +81,7 @@ class CASBinderBackend(ModelBackend):
         if not self.user_can_authenticate(user):
             return None
 
-        if pgtiou and settings.CAS_PROXY_CALLBACK:
+        if pgtiou and settings.CAS_PROXY_CALLBACK and request:
             request.session['pgtiou'] = pgtiou
 
         # send the `cas_user_authenticated` signal
