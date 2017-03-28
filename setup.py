@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='django_cas_binder',
-    version='1.6.5',
+    version='1.7.0',
     description=(
         'A thin wrapper around django-cas-ng that allows to use identifier '
         'other than username.'
@@ -27,6 +27,6 @@ setup(
         'Framework :: Django',
     ],
     install_requires=[
-        "django>=1.9.0"
+        "django>=1.9.0", "djangorestframework", "oic", "django-cas-ng"
     ]
 )
