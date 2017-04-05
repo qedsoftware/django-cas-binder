@@ -15,6 +15,7 @@ from django_cas_ng.utils import get_cas_client
 
 from django_cas_binder.models import CASUser
 from django_cas_binder.utils import get_free_username
+from django_cas_binder.create_user_and_casuser import create_user_and_casuser
 
 
 USERNAME_TRIES_LIMIT = 1000
@@ -36,14 +37,6 @@ class CASBinderBackend(ModelBackend):
 
         attributes['username'] = get_free_username(
             attributes['username'], is_username_free, USERNAME_TRIES_LIMIT)
-
-    @transaction.atomic
-    def create_user_and_cas_user(self, universal_id, attributes):
-        # user will have an "unusable" password
-        u = self.user_model.objects.create_user(
-            attributes['username'], attributes['email'])
-        CASUser.objects.create(universal_id=universal_id, user=u)
-        return u
 
     @transaction.atomic
     def update_user_attributes(self, user, attributes):
@@ -74,7 +67,9 @@ class CASBinderBackend(ModelBackend):
             if not settings.CAS_CREATE_USER:
                 return None
 
-            user = self.create_user_and_cas_user(universal_id, attributes)
+            user = create_user_and_casuser(
+                attributes['username'], attributes['email'], universal_id
+            )
             user.save()
             created = True
 
