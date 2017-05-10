@@ -30,13 +30,16 @@ class CASBinderBackend(ModelBackend):
     def __init__(self):
         self.user_model = get_user_model()
 
-    def clean_user_attributes_dict(self, attributes):
+    def clean_username(self, current_username, new_username):
         def is_username_free(username):
             return not self.user_model.objects.filter(
                 username=username).exists()
 
-        attributes['username'] = get_free_username(
-            attributes['username'], is_username_free, USERNAME_TRIES_LIMIT)
+        if current_username is not None and current_username == new_username:
+            return current_username
+        else:
+            return get_free_username(
+                new_username, is_username_free, USERNAME_TRIES_LIMIT)
 
     @transaction.atomic
     def update_user_attributes(self, user, attributes):
@@ -51,7 +54,6 @@ class CASBinderBackend(ModelBackend):
         """Verifies CAS ticket and gets or creates user object"""
         client = get_cas_client(service_url=service)
         universal_id, attributes, pgtiou = client.verify_ticket(ticket)
-        self.clean_user_attributes_dict(attributes)
 
         if attributes and request:
             request.session['attributes'] = attributes
@@ -60,12 +62,17 @@ class CASBinderBackend(ModelBackend):
 
         try:
             user = CASUser.objects.get(universal_id=universal_id).user
+            attributes['username'] = self.clean_username(
+                user.username, attributes['username'])
             self.update_user_attributes(user, attributes)
             created = False
         except CASUser.DoesNotExist:
             # check if we want to create new users, if we don't fail auth
             if not settings.CAS_CREATE_USER:
                 return None
+
+            attributes['username'] = self.clean_username(
+                None, attributes['username'])
 
             user = create_user_and_casuser(
                 attributes['username'], attributes['email'], universal_id

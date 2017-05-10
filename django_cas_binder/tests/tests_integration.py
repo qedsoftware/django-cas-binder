@@ -120,6 +120,18 @@ class TestCASBinderBackend__UserExists(TestCase):
         self.assertEqual(self.user.username, 'old_fake_username')
         self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
 
+    @override_settings(CAS_BINDER_UPDATE_USER_ATTRIBUTES=['username'])
+    def test_auth_backend_should_keep_username_when_there_is_no_update(self):
+        self.user.username = 'fake_username'
+        self.user.save()
+
+        self.assertEqual(self.user.username, 'fake_username')
+        self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
+        self.perform_auth()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'fake_username')
+        self.assertEqual(self.user.email, 'old_fake_email@qed.ai')
+
 
 @override_settings(CAS_SERVER_URL='http://fake-cas.qed.ai/')
 class TestCASBinderBackend__UserDoesNotExist(TestCase):
