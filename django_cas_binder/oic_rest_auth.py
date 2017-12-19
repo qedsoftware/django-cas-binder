@@ -15,7 +15,7 @@ class CASResponseError(Exception):
     pass
 
 
-class OICAuthentication(BaseAuthentication):
+class BaseOICAuthentication(BaseAuthentication):
     def authenticate(self, request):
         """Take a request with an 'access_token' query parameter and attempt to
         authenticate them by validating this token using a 'userinfo' endpoint
@@ -61,11 +61,31 @@ class OICAuthentication(BaseAuthentication):
             ))
 
 
-def OICScopeClaimPermissionClass(claim_name):
+def make_oic_authentication_class(*claim_names):
+
+    class OICAuthentication(BaseOICAuthentication):
+
+        def authenticate(self, request):
+            result = super(OICAuthentication, self).authenticate(request)
+            if result is None:
+                return None
+            user, auth = result
+            for claim_name in claim_names:
+                if auth.get(claim_name) is not True:
+                    raise AuthenticationFailed(
+                        'Scope claim %s is missing' % claim_name)
+            return user, auth
+    return OICAuthentication
+
+
+def make_oic_scope_claim_permission_class(claim_name):
 
     class OICScopeClaimPermission(BasePermission):
         message = 'Scope claim ' + claim_name + ' is missing'
 
         def has_permission(self, request, view):
-            return request.auth.get(claim_name) is True
+            if isinstance(request.auth, dict):
+                if 'universal_id' in request.auth:
+                    return request.auth.get(claim_name)
+            return request.user.is_authenticated()
     return OICScopeClaimPermission

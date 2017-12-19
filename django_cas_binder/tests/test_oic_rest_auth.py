@@ -7,17 +7,21 @@ from django.contrib.auth import get_user_model
 from django_cas_binder.models import CASUser
 
 from django_cas_binder.oic_rest_auth import (
-    OICAuthentication, OICScopeClaimPermissionClass, CASResponseError
+    BaseOICAuthentication, make_oic_authentication_class,
+    make_oic_scope_claim_permission_class, CASResponseError
 )
 
 
-class RestFrameworkOicAuthTestMixin(object):
+class RestFrameworkAuthTestMixin(object):
     """This class exists because requests as created with APIRequestFactory
     are different from those that are fed into authentication class
     .authenticate() method. To workaround this issue, we create a fake view
     with the sole purpose of throwing request.user and request.auth to us.
-    Configurable by setting self.permission_classes.
+    Configurable by setting self.permission_classes and
+    self.authentication_classes.
     """
+    authentication_classes = None
+    permission_classes = None
 
     def simulate_authentication_using_fake_view(self, request):
         """Take a request as produced by APIRequestFactory and return a
@@ -28,8 +32,9 @@ class RestFrameworkOicAuthTestMixin(object):
             pass
 
         class FakeView(rest_framework.views.APIView):
-            authentication_classes = OICAuthentication,
-            if getattr(self, 'permission_classes', None):
+            if self.authentication_classes is not None:
+                authentication_classes = self.authentication_classes
+            if self.permission_classes is not None:
                 permission_classes = self.permission_classes
 
             def get(self, request):
@@ -73,7 +78,14 @@ class RestFrameworkOicAuthTestMixin(object):
 
 
 @override_settings(CAS_SERVER_URL="https://fake-cas.qed.ai/")
-class TestOICAuthentication(TestCase, RestFrameworkOicAuthTestMixin):
+class TestBaseOICAuthentication(TestCase, RestFrameworkAuthTestMixin):
+    authentication_classes = BaseOICAuthentication,
+
+    def test_auth_not_attempted(self):
+        request = APIRequestFactory().get('/')
+        user, auth = self.simulate_authentication_using_fake_view(request)
+        self.assertFalse(user.is_authenticated())
+
     def test_auth_success(self):
         self.user = get_user_model().objects.create_user(
             username='fake_username', email='fake_email@qed.ai')
@@ -133,8 +145,10 @@ class TestOICAuthentication(TestCase, RestFrameworkOicAuthTestMixin):
 
 
 @override_settings(CAS_SERVER_URL="https://fake-cas.qed.ai/")
-class TestOICScopeClaimPermission(TestCase, RestFrameworkOicAuthTestMixin):
-    permission_classes = OICScopeClaimPermissionClass("can_blah"),
+class TestMakeOICScopeClaimPermissionClass(
+        TestCase, RestFrameworkAuthTestMixin):
+    authentication_classes = BaseOICAuthentication,
+    permission_classes = make_oic_scope_claim_permission_class("can_blah"),
 
     def test_auth_success(self):
         self.user = get_user_model().objects.create_user(
@@ -175,3 +189,10 @@ class TestOICScopeClaimPermission(TestCase, RestFrameworkOicAuthTestMixin):
             'detail': 'Scope claim can_blah is missing'
         })
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(CAS_SERVER_URL="https://fake-cas.qed.ai/")
+class TestMakeOicAuthenticationClass(
+        TestMakeOICScopeClaimPermissionClass, TestBaseOICAuthentication):
+    authentication_classes = make_oic_authentication_class("can_blah"),
+    permission_classes = None
